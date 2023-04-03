@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Classic Super Mastermind</title>
+		<meta charset="iso-8859-1">
+		<script src="js/jquery-3.3.1.min.js"></script>
+		<script src="js/mastermind_board.js"></script>
+
+		<script>
+			MastermindBoard.hooks.enrichGuessRow = function(newGuessRow, rowIndex, feedback){
+				var feedbackTxt = "";
+				for (var i=0; i<feedback.correct; i++){
+					feedbackTxt += '<div class="smallpeg black"></div>';
+				}
+				for (var i=0; i<feedback.misplaced; i++){
+					feedbackTxt += '<div class="smallpeg white"></div>';
+				}
+				for (var i=0; i<feedback.missing; i++){
+					feedbackTxt += '<div class="smallpeg missing"></div>';
+				}
+				newGuessRow.prepend(`<div class="guessnum">${rowIndex}</div><div class="rating">${feedbackTxt}</div>`);
+			};
+			
+			MastermindBoard.settings.maxRowNumber = 12;
+			
+			$(document).ready(function(){
+				MastermindBoard.init();
+			});
+		</script>
+
+
+		<style>
+		/* ------- Board zones ----- */
+		
+		#game-board {
+			/* -- manipulation -- */
+			
+			user-select: none; /* currently, only supported by Chrome and Opera */
+			-webkit-user-select: none; /* vendor-prefixed for Safari */
+			-khtml-user-select: none; /* vendor-prefixed for Konqueror */
+			-moz-user-select: none; /* vendor-prefixed for Firefox */
+			-ms-user-select: none; /* vendor-prefixed for IE / Edge */
+			
+			/* esp. for touch screen devices */
+			touch-action: manipulation; /* essentially, disable double-tap zoom and other non-standard behav. */
+			-webkit-tap-highlight-color: transparent; /* sur webkit, un fond bleu apparaît au click sur les éléments "réactifs" */
+			
+			
+			/* -- visual style proper -- */
+			
+			background-color: #b25717; /* = slightly darker nuance of "chocolate", since in some browsers "chocolate" borders would be undistinguishable */
+			width: 370px;
+			border: 6px outset chocolate;
+		}
+		#code-shield {
+			position: relative;
+			border: 2px outset chocolate;
+		}
+		#decoding-board-apparent {
+			border: 2px inset chocolate;
+		}
+		#peg-pool {
+			padding : 2px;
+			margin : 4px;
+			border: 6px inset lightgrey;
+			background-color: darkgrey;
+		}
+		
+		/* Emulate real game board : fixed height for bigger screens : */
+		@media screen and (min-height: 708px){
+			#decoding-board-apparent {
+				display: table-cell;
+				vertical-align: bottom;
+				width : 370px; /* too bad 100% wouldn't work with display: table-cell...*/
+				height: 588px; /* = 12 * .guess */
+			}
+		}
+		
+		
+		/* ------- Structural "Row" in the game board = each Guess ------ */
+		
+		.guess,
+		.guess-like {
+			text-align: right;
+			height: 45px;
+			padding: 2px;
+		}
+		.guess > *,
+		.guess-like > * {
+			vertical-align: middle;
+			display: inline-block;
+		}
+		
+		
+		/* ------- Code, Code cover and buttons ------ */
+				
+		.guess      > .code,
+		#next-guess > .code {
+			margin : 0 10px; /* equiv. to .code-cover horizontal margin */
+		}
+
+		.code-cover { /* when it is off :-) */
+			/* adding up to a 10px horizontal margin */
+			margin: 0 3px;
+			padding: 0 4px;
+			border-left: 3px ridge chocolate;
+			border-right: 3px ridge chocolate;
+		}
+		
+		#game-board.gamestage-guessing   .code-cover,
+		#game-board.gamestage-feedback   .code-cover {
+			height: 23px; /* since its invisible content is taller */
+			margin: 0;
+			padding: 0 2px;
+			border-width: 2px 8px 20px 7px;
+			border-style: outset;
+			border-color: black chocolate #b25717 chocolate;
+			background-color: #b25717;
+		}
+		#game-board.gamestage-guessing   .code-cover .code,
+		#game-board.gamestage-feedback   .code-cover .code {
+		 	visibility: hidden;
+		 }
+
+		#game-board.gamestage-codemaking #next-guess,
+		#game-board.gamestage-win        #next-guess,
+		#game-board.gamestage-loss       #next-guess
+		 {display: none;}
+
+		#game-board.gamestage-guessing #btnStart,
+		#game-board.gamestage-feedback #btnStart,
+		#game-board.gamestage-win      #btnStart,
+		#game-board.gamestage-loss     #btnStart
+		 {display: none;}
+		
+		
+		/* --------- Color pegs -------- */
+
+		.roundpeg {
+			display: inline-block;
+			vertical-align: text-bottom;
+			border: 2px solid black;
+			border-radius: 17px;
+			width: 30px;
+			height: 30px;
+			margin: 0px 1px;
+			
+			text-align: left; /* <- for the small "reflection" */
+			background-image: radial-gradient(rgba(255,255,255,0) 40%, rgba(0,0,0,.8));
+		}
+		.roundpeg::before { /* add a small "reflection" */
+			font-family: arial;
+			content: "\0000a0\002022"; /* = &nbsp;&bull; in HTML */
+			color:white;
+			opacity : 0.85;
+		}
+
+		.roundpeg.MMSel {
+			animation: flashingBorder 0.8s infinite normal;
+		}
+
+		@keyframes flashingBorder {
+			from { border-color: white; opacity : 0.5; }
+		}
+
+		.roundpeg[data-peg-color="red"]    {background-color: red;}
+		.roundpeg[data-peg-color="orange"] {background-color: orange;}
+		.roundpeg[data-peg-color="yellow"] {background-color: yellow;}
+		.roundpeg[data-peg-color="green"]  {background-color: green;}
+		.roundpeg[data-peg-color="blue"]   {background-color: blue;}
+		.roundpeg[data-peg-color="brown"]  {background-color: brown;}
+		.roundpeg[data-peg-color="black"]  {background-color: #222;}
+		.roundpeg[data-peg-color="white"]  {background-color: white;}
+
+		.roundpeg[data-peg-color=""] {
+			border: 10px ridge chocolate;
+			background-color: black;
+			background-image: none;
+			width: 14px;
+			height: 14px;
+		}
+		.roundpeg[data-peg-color=""]::before {
+			content: "";
+		}
+		#peg-pool
+		.roundpeg[data-peg-color=""] { /* -> Hide "?" option to select from, since you can double-click to remove color */
+			display: none;
+		}
+		
+		.roundpeg,
+		#peg-pool .roundpeg::before {
+			cursor: default;
+		}
+		#code-shield .roundpeg,
+		#code-shield .roundpeg::before,
+		#next-guess .roundpeg,
+		#next-guess .roundpeg::before,
+		#peg-pool .roundpeg,
+		#peg-pool .roundpeg::before {
+			cursor: pointer;
+		}
+
+
+		/* --------- Guess row content -------- */
+
+		.guessnum {
+			width: 35px;
+			margin-right: 15px;
+
+			font-family: Arial, Helvetica, sans-serif;
+			font-size: 30px;
+			font-weight: bold;
+			color: white;
+			opacity: 0.5;
+			text-shadow : 3px 3px 1px black;
+		}
+
+		.rating {
+			line-height: 0px;
+			width: auto;
+		}
+
+		.rating .smallpeg {
+			display: inline-block;
+			border-radius: 50%;
+			width: 5px; height: 5px;
+			margin: 1px;
+		}
+		.rating .smallpeg.black  {border: 5px ridge #222; background-color: black; }
+		.rating .smallpeg.white  {border: 5px ridge white; background-color: lightgrey; }
+		.rating .smallpeg.missing {border: 3px ridge chocolate; background-color: black;
+			width: 3px; height: 3px;
+			margin: 4px;
+		}
+
+		.rating {
+			border: 2px inset chocolate;
+			border-radius: 7px;
+			padding : 1px 1px;
+		}
+		.code {
+			border: 2px inset chocolate;
+			border-radius: 17px;
+			padding : 1px 5px;
+		}
+
+		</style>
+	</head>
+
+	<body>
+		<div id="game-board">
+			<div id="code-shield" class="guess-like">
+				<button id="btnReset" onclick="MastermindBoard.reset();">Reset</button>
+				<button id="btnStart" onclick="MastermindBoard.startGuessing();">Go!</button>
+				<div class="code-cover">
+					<div class="code"><!-- empty placeholder --></div>
+				</div>
+			</div>
+			<div id="decoding-board-apparent">
+				<div id="next-guess" class="guess-like">
+					<button id="btnSubmit" onclick="MastermindBoard.submitGuess()">Submit</button>
+					<div class="code">
+						<div data-peg-color="" class="roundpeg"></div
+						><div data-peg-color="" class="roundpeg"></div
+						><div data-peg-color="" class="roundpeg"></div
+						><div data-peg-color="" class="roundpeg"></div
+						><div data-peg-color="" class="roundpeg"></div>
+					</div>
+				</div>
+				<div id="decoding-board">
+					<!-- empty at start -->
+				</div>
+			</div>
+			<div id="peg-pool">
+				<div data-peg-color="" class="roundpeg"></div
+				><div data-peg-color="red" class="roundpeg"></div
+				><div data-peg-color="orange" class="roundpeg"></div
+				><div data-peg-color="yellow" class="roundpeg"></div
+				><div data-peg-color="green" class="roundpeg"></div
+				><div data-peg-color="blue" class="roundpeg"></div
+				><div data-peg-color="brown" class="roundpeg"></div
+				><div data-peg-color="black" class="roundpeg"></div
+				><div data-peg-color="white" class="roundpeg"></div>
+			</div>
+		</div>
+		Classic SuperMastermind, based on Mastermind Canvas &copy;Krom 2020
+	</body>
+</html>
